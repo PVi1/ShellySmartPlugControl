@@ -1,0 +1,118 @@
+let CONFIG = {
+denon_ip: "192.168.1.254",
+check_interval: "30000",
+b64_status_on: "PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPGxpc3RHbG9iYWxzPjxNYWluWm9uZT48UG93ZXI+MTwvUG93ZXI+PC9NYWluWm9uZT48L2xpc3RHbG9iYWxzPg==",
+b64_status_off: "PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPGxpc3RHbG9iYWxzPjxNYWluWm9uZT48UG93ZXI+MzwvUG93ZXI+PC9NYWluWm9uZT48L2xpc3RHbG9iYWxzPg=="
+}
+
+let inkr=1;
+
+function enable_switch() {
+  
+    //enable switch
+    Shelly.call("Switch.Set", {
+            id: 0,
+            on: true
+        },
+        function(result, error_code, error_message) {
+
+            if (error_code != 0) {
+              print("Chyba: "+ error_code + "detail: " + error_message + " pri zapinani switcha.");              
+            }
+        }
+    );
+
+}
+
+function disable_switch() {
+
+    Shelly.call("Switch.Set", {
+            id: 0,
+            on: false
+        },
+        function(result, error_code, error_message) {
+            if (error_code != 0) {
+              print("Chyba: "+ error_code + "detail: " + error_message + " pri vypinani switcha.");              
+            }
+           
+        }
+
+    );
+
+}
+
+function disable_enabled_switch() {
+
+    Shelly.call("Switch.GetStatus", {
+            id: 0
+        },
+        function(result, error_code, error_message) {
+
+            //print(JSON.stringify(result));        
+            if (result.output !== false || error_code !== 0) {
+
+                print("Vypinam switch");
+                //disable switch
+                disable_switch();
+
+            }
+
+        }
+    );
+
+}
+
+function enable_disabled_switch() {
+
+    //check if the switch is disabled and schedule its enablement
+    Shelly.call(
+        "Switch.GetStatus", {
+            id: 0
+        },
+        function(result, error_code, error_message) {
+            //print(JSON.stringify(result));        
+            if (result.output !== true && error_code == 0) {
+             
+                print("Zapinam switch.");
+                enable_switch();
+            }
+
+        }
+    );
+
+}
+
+function processHttpResponse(result, error_code, error) {
+ 
+ print("v response");
+ 
+  if (error_code != 0) {
+    // process error
+    print("chyba" + error_code + "detail:"+ error);
+  } else {
+    // process result
+    if (result.body_b64 == CONFIG.b64_status_on){
+      //zapni
+      enable_disabled_switch();
+    }else if (result.body_b64 == CONFIG.b64_status_off){
+      //zapni
+      disable_enabled_switch();
+      }
+  }
+}
+
+
+function check_avr_state() {
+
+print("idem");
+
+let ts = Shelly.getComponentStatus("sys").unixtime;
+if (ts == null){
+  inkr = inkr + 1;
+  ts = inkr
+}
+  Shelly.call("HTTP.GET", {url: "https://CONFIG.denon_ip:10443/ajax/globals/get_config?type=4&_="+ts, ssl_ca:"*"}, processHttpResponse);
+    
+}
+
+Timer.set(CONFIG.check_interval, true, check_avr_state);
